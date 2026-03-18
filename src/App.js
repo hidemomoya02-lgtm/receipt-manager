@@ -15,6 +15,31 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+// 画像を圧縮してbase64に変換
+const compressAndConvert = (file) => new Promise((resolve, reject) => {
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  img.onload = () => {
+    const canvas = document.createElement('canvas');
+    const maxSize = 1200;
+    let w = img.width;
+    let h = img.height;
+    if (w > maxSize || h > maxSize) {
+      if (w > h) { h = (h / w) * maxSize; w = maxSize; }
+      else { w = (w / h) * maxSize; h = maxSize; }
+    }
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, w, h);
+    const base64 = canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+    URL.revokeObjectURL(url);
+    resolve(base64);
+  };
+  img.onerror = reject;
+  img.src = url;
+});
+
 export default function App() {
   const [screen, setScreen] = useState('home');
   const [image, setImage] = useState(null);
@@ -22,21 +47,14 @@ export default function App() {
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef(null);
 
-  const toBase64 = (file) => new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result.split(',')[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-
   const analyzeReceipt = async (file) => {
     setScreen('analyzing');
     try {
-      const base64 = await toBase64(file);
+      const base64 = await compressAndConvert(file);
       const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64, mediaType: file.type }),
+        body: JSON.stringify({ image: base64, mediaType: 'image/jpeg' }),
       });
       const parsed = await response.json();
       if (parsed.error) throw new Error(parsed.error);
