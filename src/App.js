@@ -18,13 +18,9 @@ const db = getFirestore(app);
 export default function App() {
   const [screen, setScreen] = useState('home');
   const [image, setImage] = useState(null);
-  const [imageFile, setImageFile] = useState(null);
-  const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState(null);
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef(null);
-
-  const CLAUDE_API_KEY = process.env.REACT_APP_CLAUDE_API_KEY;
 
   const toBase64 = (file) => new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -34,57 +30,21 @@ export default function App() {
   });
 
   const analyzeReceipt = async (file) => {
-    setAnalyzing(true);
+    setScreen('analyzing');
     try {
       const base64 = await toBase64(file);
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const response = await fetch('/api/analyze', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': CLAUDE_API_KEY,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model: 'claude-opus-4-5',
-          max_tokens: 1024,
-          messages: [{
-            role: 'user',
-            content: [
-              {
-                type: 'image',
-                source: { type: 'base64', media_type: file.type, data: base64 }
-              },
-              {
-                type: 'text',
-                text: `このレシートまたは領収書を解析してください。以下のJSON形式のみで返答してください。他の文章は不要です。
-{
-  "date": "YYYY-MM-DD形式の日付",
-  "store": "店名・取引先",
-  "amount_with_tax": 税込金額の数値,
-  "amount_without_tax": 税抜金額の数値,
-  "tax_amount": 消費税額の数値,
-  "payment_method": "現金またはPayPayまたはクレジットカード",
-  "account_title": "勘定科目（食料品費・消耗品費・交際費・水道光熱費・通信費・その他のいずれか）",
-  "memo": "備考があれば"
-}
-日付が読み取れない場合は今日の日付、金額が読み取れない場合は0を入れてください。
-支払方法の記載がない場合は現金としてください。`
-              }
-            ]
-          }]
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64, mediaType: file.type }),
       });
-      const data = await response.json();
-      const text = data.content[0].text;
-      const clean = text.replace(/```json|```/g, '').trim();
-      const parsed = JSON.parse(clean);
+      const parsed = await response.json();
+      if (parsed.error) throw new Error(parsed.error);
       setResult(parsed);
       setScreen('confirm');
     } catch (e) {
       alert('読み取りに失敗しました。もう一度撮影してください。');
       setScreen('home');
-    } finally {
-      setAnalyzing(false);
     }
   };
 
@@ -93,8 +53,6 @@ export default function App() {
     if (!file) return;
     const url = URL.createObjectURL(file);
     setImage(url);
-    setImageFile(file);
-    setScreen('analyzing');
     analyzeReceipt(file);
   };
 
