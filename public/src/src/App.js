@@ -145,4 +145,195 @@ export default function App() {
 
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(toRows(cash)), '現金出納帳');
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(toRow
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(toRows(other)), '事業主借');
+
+      const today = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, `receipts_${today}.xlsx`);
+    } catch (e) {
+      alert('Excel出力に失敗しました。');
+    }
+  };
+
+  // 結果の編集
+  const updateResult = (key, value) => {
+    setResult(prev => ({ ...prev, [key]: value }));
+  };
+
+  return (
+    <div style={styles.container}>
+      {/* ホーム画面 */}
+      {screen === 'home' && (
+        <div style={styles.card}>
+          <h1 style={styles.title}>📄 レシート管理</h1>
+          <button style={styles.primaryBtn} onClick={() => fileInputRef.current.click()}>
+            📷 レシートを撮影する
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleCapture}
+            style={{ display: 'none' }}
+          />
+          <button style={styles.secondaryBtn} onClick={exportExcel}>
+            📊 Excelを出力する
+          </button>
+        </div>
+      )}
+
+      {/* 解析中画面 */}
+      {screen === 'analyzing' && (
+        <div style={styles.card}>
+          <h2 style={styles.title}>解析中...</h2>
+          {image && <img src={image} alt="レシート" style={styles.preview} />}
+          <p style={styles.subtext}>しばらくお待ちください</p>
+        </div>
+      )}
+
+      {/* 確認画面 */}
+      {screen === 'confirm' && result && (
+        <div style={styles.card}>
+          <h2 style={styles.title}>📋 読み取り結果</h2>
+          {image && <img src={image} alt="レシート" style={styles.preview} />}
+
+          <div style={styles.field}>
+            <label style={styles.label}>日付</label>
+            <input style={styles.input} value={result.date || ''} onChange={e => updateResult('date', e.target.value)} />
+          </div>
+          <div style={styles.field}>
+            <label style={styles.label}>店名・取引先</label>
+            <input style={styles.input} value={result.store || ''} onChange={e => updateResult('store', e.target.value)} />
+          </div>
+          <div style={styles.field}>
+            <label style={styles.label}>金額（税込）</label>
+            <input style={styles.input} type="number" value={result.amount_with_tax || 0} onChange={e => updateResult('amount_with_tax', Number(e.target.value))} />
+          </div>
+          <div style={styles.field}>
+            <label style={styles.label}>金額（税抜）</label>
+            <input style={styles.input} type="number" value={result.amount_without_tax || 0} onChange={e => updateResult('amount_without_tax', Number(e.target.value))} />
+          </div>
+          <div style={styles.field}>
+            <label style={styles.label}>消費税額</label>
+            <input style={styles.input} type="number" value={result.tax_amount || 0} onChange={e => updateResult('tax_amount', Number(e.target.value))} />
+          </div>
+          <div style={styles.field}>
+            <label style={styles.label}>支払方法</label>
+            <select style={styles.input} value={result.payment_method || '現金'} onChange={e => updateResult('payment_method', e.target.value)}>
+              <option>現金</option>
+              <option>PayPay</option>
+              <option>クレジットカード</option>
+            </select>
+          </div>
+          <div style={styles.field}>
+            <label style={styles.label}>勘定科目</label>
+            <select style={styles.input} value={result.account_title || ''} onChange={e => updateResult('account_title', e.target.value)}>
+              <option>食料品費</option>
+              <option>消耗品費</option>
+              <option>交際費</option>
+              <option>水道光熱費</option>
+              <option>通信費</option>
+              <option>その他</option>
+            </select>
+          </div>
+          <div style={styles.field}>
+            <label style={styles.label}>備考</label>
+            <input style={styles.input} value={result.memo || ''} onChange={e => updateResult('memo', e.target.value)} />
+          </div>
+
+          <button style={styles.primaryBtn} onClick={saveRecord} disabled={saving}>
+            {saving ? '保存中...' : '✅ 保存する'}
+          </button>
+          <button style={styles.dangerBtn} onClick={() => { setScreen('home'); setImage(null); setResult(null); }}>
+            🗑️ 破棄して撮り直す
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const styles = {
+  container: {
+    minHeight: '100vh',
+    backgroundColor: '#f5f5f5',
+    display: 'flex',
+    justifyContent: 'center',
+    padding: '20px',
+  },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: '12px',
+    padding: '24px',
+    width: '100%',
+    maxWidth: '480px',
+    height: 'fit-content',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+  },
+  title: {
+    textAlign: 'center',
+    marginBottom: '24px',
+    fontSize: '22px',
+  },
+  primaryBtn: {
+    width: '100%',
+    padding: '14px',
+    backgroundColor: '#2563eb',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '16px',
+    cursor: 'pointer',
+    marginBottom: '12px',
+  },
+  secondaryBtn: {
+    width: '100%',
+    padding: '14px',
+    backgroundColor: '#16a34a',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '16px',
+    cursor: 'pointer',
+    marginBottom: '12px',
+  },
+  dangerBtn: {
+    width: '100%',
+    padding: '14px',
+    backgroundColor: '#dc2626',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '16px',
+    cursor: 'pointer',
+    marginBottom: '12px',
+  },
+  preview: {
+    width: '100%',
+    borderRadius: '8px',
+    marginBottom: '16px',
+    maxHeight: '200px',
+    objectFit: 'contain',
+  },
+  field: {
+    marginBottom: '12px',
+  },
+  label: {
+    display: 'block',
+    fontSize: '13px',
+    color: '#666',
+    marginBottom: '4px',
+  },
+  input: {
+    width: '100%',
+    padding: '10px',
+    border: '1px solid #ddd',
+    borderRadius: '6px',
+    fontSize: '15px',
+    boxSizing: 'border-box',
+  },
+  subtext: {
+    textAlign: 'center',
+    color: '#666',
+  },
+};
